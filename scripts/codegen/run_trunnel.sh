@@ -5,11 +5,11 @@ if test "x$TRUNNEL_PATH" != "x"; then
   export PYTHONPATH
 fi
 
+OPTIONS="--require-version=1.5.1"
+
 # Get all .trunnel files recursively from that directory so we can support
 # multiple sub-directories.
-for file in `find ./src/trunnel/ -name '*.trunnel'`; do
-  python -m trunnel --require-version=1.4 $file
-done
+find ./src/trunnel/ -name '*.trunnel' -exec python -m trunnel ${OPTIONS} {} \;
 
-python -m trunnel --require-version=1.4 --write-c-files --target-dir=./src/ext/trunnel/
+python -m trunnel ${OPTIONS} --write-c-files --target-dir=./src/ext/trunnel/
 

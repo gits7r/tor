@@ -1,16 +1,17 @@
 #!/bin/sh
 
-if [ -x "`which autoreconf 2>/dev/null`" ] ; then
-  opt="-if"
+if command -v autoreconf; then
+  opt="-i -f -W all,error"
 
-  for i in $@; do
+  for i in "$@"; do
     case "$i" in
       -v)
-        opt=$opt"v"
+        opt="${opt} -v"
         ;;
     esac
   done
 
+  # shellcheck disable=SC2086
   exec autoreconf $opt
 fi
 

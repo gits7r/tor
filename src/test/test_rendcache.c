@@ -1,19 +1,25 @@
-/* Copyright (c) 2010-2016, The Tor Project, Inc. */
+/* Copyright (c) 2010-2019, The Tor Project, Inc. */
 /* See LICENSE for licensing information */
 
 #include "orconfig.h"
-#include "or.h"
+#include "core/or/or.h"
 
-#include "test.h"
+#include "test/test.h"
 #define RENDCACHE_PRIVATE
-#include "rendcache.h"
-#include "router.h"
-#include "routerlist.h"
-#include "config.h"
-#include "hs_common.h"
-#include <openssl/rsa.h>
-#include "rend_test_helpers.h"
-#include "log_test_helpers.h"
+#include "feature/rend/rendcache.h"
+#include "feature/relay/router.h"
+#include "feature/nodelist/routerlist.h"
+#include "app/config/config.h"
+#include "feature/hs/hs_common.h"
+
+#include "core/or/extend_info_st.h"
+#include "feature/rend/rend_encoded_v2_service_descriptor_st.h"
+#include "feature/rend/rend_intro_point_st.h"
+#include "feature/rend/rend_service_descriptor_st.h"
+#include "feature/nodelist/routerinfo_st.h"
+
+#include "test/rend_test_helpers.h"
+#include "test/log_test_helpers.h"
 
 #define NS_MODULE rend_cache
 
@@ -21,22 +27,6 @@ static const int RECENT_TIME = -10;
 static const int TIME_IN_THE_PAST = -(REND_CACHE_MAX_AGE + \
                                       REND_CACHE_MAX_SKEW + 60);
 static const int TIME_IN_THE_FUTURE = REND_CACHE_MAX_SKEW + 60;
-
-static rend_data_t *
-mock_rend_data(const char *onion_address)
-{
-  rend_data_v2_t *v2_data = tor_malloc_zero(sizeof(*v2_data));
-  rend_data_t *rend_query = &v2_data->base_;
-  rend_query->version = 2;
-
-  strlcpy(v2_data->onion_address, onion_address,
-          sizeof(v2_data->onion_address));
-  v2_data->auth_type = REND_NO_AUTH;
-  rend_query->hsdirs_fp = smartlist_new();
-  smartlist_add(rend_query->hsdirs_fp, tor_memdup("aaaaaaaaaaaaaaaaaaaaaaaa",
-                                                 DIGEST_LEN));
-  return rend_query;
-}
 
 static void
 test_rend_cache_lookup_entry(void *data)
@@ -75,6 +65,7 @@ test_rend_cache_lookup_entry(void *data)
   tt_int_op(ret, OP_EQ, 0);
 
   ret = rend_cache_lookup_entry(service_id, 2, &entry);
+  tt_int_op(ret, OP_EQ, 0);
   tt_assert(entry);
   tt_int_op(entry->len, OP_EQ, strlen(desc_holder->desc_str));
   tt_str_op(entry->desc, OP_EQ, desc_holder->desc_str);
@@ -158,12 +149,16 @@ test_rend_cache_store_v2_desc_as_client(void *data)
   // Test incorrect descriptor ID
   rend_cache_init();
   mock_rend_query = mock_rend_data(service_id);
-  desc_id_base32[0]++;
+  char orig = desc_id_base32[0];
+  if (desc_id_base32[0] == 'a')
+    desc_id_base32[0] = 'b';
+  else
+    desc_id_base32[0] = 'a';
   ret = rend_cache_store_v2_desc_as_client(desc_holder->desc_str,
                                            desc_id_base32, mock_rend_query,
                                            NULL);
   tt_int_op(ret, OP_EQ, -1);
-  desc_id_base32[0]--;
+  desc_id_base32[0] = orig;
   rend_cache_free_all();
 
   // Test too old descriptor
@@ -793,7 +788,9 @@ test_rend_cache_clean(void *data)
   desc_two->pk = pk_generate(1);
 
   strmap_set_lc(rend_cache, "foo1", one);
+  rend_cache_increment_allocation(rend_cache_entry_allocation(one));
   strmap_set_lc(rend_cache, "foo2", two);
+  rend_cache_increment_allocation(rend_cache_entry_allocation(two));
 
   rend_cache_clean(time(NULL), REND_CACHE_TYPE_CLIENT);
   tt_int_op(strmap_size(rend_cache), OP_EQ, 0);
@@ -811,7 +808,9 @@ test_rend_cache_clean(void *data)
   desc_one->pk = pk_generate(0);
   desc_two->pk = pk_generate(1);
 
+  rend_cache_increment_allocation(rend_cache_entry_allocation(one));
   strmap_set_lc(rend_cache, "foo1", one);
+  rend_cache_increment_allocation(rend_cache_entry_allocation(two));
   strmap_set_lc(rend_cache, "foo2", two);
 
   rend_cache_clean(time(NULL), REND_CACHE_TYPE_CLIENT);
@@ -846,7 +845,7 @@ test_rend_cache_failure_entry_free(void *data)
   (void)data;
 
   // Test that it can deal with a NULL argument
-  rend_cache_failure_entry_free(NULL);
+  rend_cache_failure_entry_free_(NULL);
 
  /* done: */
  /*  (void)0; */
@@ -959,9 +958,9 @@ test_rend_cache_free_all(void *data)
 
   rend_cache_free_all();
 
-  tt_assert(!rend_cache);
-  tt_assert(!rend_cache_v2_dir);
-  tt_assert(!rend_cache_failure);
+  tt_ptr_op(rend_cache, OP_EQ, NULL);
+  tt_ptr_op(rend_cache_v2_dir, OP_EQ, NULL);
+  tt_ptr_op(rend_cache_failure, OP_EQ, NULL);
   tt_assert(!rend_cache_total_allocation);
 
  done:
@@ -975,7 +974,7 @@ test_rend_cache_entry_free(void *data)
   rend_cache_entry_t *e;
 
   // Handles NULL correctly
-  rend_cache_entry_free(NULL);
+  rend_cache_entry_free_(NULL);
 
   // Handles NULL descriptor correctly
   e = tor_malloc_zero(sizeof(rend_cache_entry_t));
@@ -1147,7 +1146,7 @@ test_rend_cache_failure_intro_entry_free(void *data)
   rend_cache_failure_intro_t *entry;
 
   // Handles a null argument
-  rend_cache_failure_intro_entry_free(NULL);
+  rend_cache_failure_intro_entry_free_(NULL);
 
   // Handles a non-null argument
   entry = rend_cache_failure_intro_entry_new(INTRO_POINT_FAILURE_TIMEOUT);
@@ -1160,7 +1159,7 @@ test_rend_cache_failure_purge(void *data)
   (void)data;
 
   // Handles a null failure cache
-  strmap_free(rend_cache_failure, rend_cache_failure_entry_free_);
+  strmap_free(rend_cache_failure, rend_cache_failure_entry_free_void);
   rend_cache_failure = NULL;
 
   rend_cache_failure_purge();
