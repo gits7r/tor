@@ -1,14 +1,10 @@
-/* Copyright (c) 2015-2019, The Tor Project, Inc. */
+/* Copyright (c) 2015-2016, The Tor Project, Inc. */
 /* See LICENSE for licensing information */
 
-#include "core/or/or.h"
-#include "lib/process/setuid.h"
+#include "or.h"
 
 #ifdef HAVE_SYS_CAPABILITY_H
 #include <sys/capability.h>
-#endif
-#ifdef HAVE_UNISTD_H
-#include <unistd.h>
 #endif
 
 #define TEST_BUILT_WITH_CAPS         0
@@ -75,7 +71,7 @@ check_can_bind_low_ports(void)
 
   return -1;
 }
-#endif /* !defined(_WIN32) */
+#endif
 
 int
 main(int argc, char **argv)
@@ -83,11 +79,10 @@ main(int argc, char **argv)
 #if defined(_WIN32)
   (void) argc;
   (void) argv;
-  (void) which_test;
 
   fprintf(stderr, "This test is not supported on your OS.\n");
   return 77;
-#else /* !(defined(_WIN32)) */
+#else
   const char *username;
   const char *testname;
   if (argc != 3) {
@@ -178,7 +173,7 @@ main(int argc, char **argv)
         }
         cap_free(caps);
       }
-#endif /* defined(HAVE_LINUX_CAPABILITIES) */
+#endif
       break;
     default:
       fprintf(stderr, "Unsupported test '%s'\n", testname);
@@ -191,5 +186,6 @@ main(int argc, char **argv)
   }
 
   return (okay ? 0 : 1);
-#endif /* defined(_WIN32) */
+#endif
 }
+

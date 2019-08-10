@@ -1,20 +1,16 @@
-/* Copyright (c) 2016-2019, The Tor Project, Inc. */
+/* Copyright (c) 2016, The Tor Project, Inc. */
 /* See LICENSE for licensing information */
 
 /* Unit tests for OOS handler */
 
 #define CONNECTION_PRIVATE
 
-#include "core/or/or.h"
-#include "app/config/config.h"
-#include "core/mainloop/connection.h"
-#include "core/or/connection_or.h"
-#include "feature/dircommon/directory.h"
-#include "core/mainloop/mainloop.h"
-#include "test/test.h"
-
-#include "feature/dircommon/dir_connection_st.h"
-#include "core/or/or_connection_st.h"
+#include "or.h"
+#include "config.h"
+#include "connection.h"
+#include "connection_or.h"
+#include "main.h"
+#include "test.h"
 
 static or_options_t mock_options;
 
@@ -56,7 +52,7 @@ kill_conn_list_mock(smartlist_t *conns)
 {
   ++kill_conn_list_calls;
 
-  tt_ptr_op(conns, OP_NE, NULL);
+  tt_assert(conns != NULL);
 
   kill_conn_list_killed += smartlist_len(conns);
 
@@ -252,7 +248,7 @@ close_for_error_mock(or_connection_t *orconn, int flush)
 {
   (void)flush;
 
-  tt_ptr_op(orconn, OP_NE, NULL);
+  tt_assert(orconn != NULL);
   ++cfe_calls;
 
  done:
@@ -268,7 +264,7 @@ mark_for_close_oos_mock(connection_t *conn,
   (void)line;
   (void)file;
 
-  tt_ptr_op(conn, OP_NE, NULL);
+  tt_assert(conn != NULL);
   ++mark_calls;
 
  done:
@@ -302,8 +298,8 @@ test_oos_kill_conn_list(void *arg)
   dir_c2->base_.purpose = DIR_PURPOSE_MIN_;
   c2 = TO_CONN(dir_c2);
 
-  tt_ptr_op(c1, OP_NE, NULL);
-  tt_ptr_op(c2, OP_NE, NULL);
+  tt_assert(c1 != NULL);
+  tt_assert(c2 != NULL);
 
   /* Make list */
   l = smartlist_new();
@@ -349,7 +345,7 @@ get_num_circuits_mock(or_connection_t *conn)
 {
   int circs = 0;
 
-  tt_ptr_op(conn, OP_NE, NULL);
+  tt_assert(conn != NULL);
 
   if (conns_with_circs &&
       smartlist_contains(conns_with_circs, TO_CONN(conn))) {
@@ -401,7 +397,7 @@ test_oos_pick_oos_victims(void *arg)
   /* Try picking one */
   picked = pick_oos_victims(1);
   /* It should be the one with circuits */
-  tt_ptr_op(picked, OP_NE, NULL);
+  tt_assert(picked != NULL);
   tt_int_op(smartlist_len(picked), OP_EQ, 1);
   tt_assert(smartlist_contains(picked, smartlist_get(conns_for_mock, 0)));
   smartlist_free(picked);
@@ -409,14 +405,14 @@ test_oos_pick_oos_victims(void *arg)
   /* Try picking none */
   picked = pick_oos_victims(0);
   /* We should get an empty list */
-  tt_ptr_op(picked, OP_NE, NULL);
+  tt_assert(picked != NULL);
   tt_int_op(smartlist_len(picked), OP_EQ, 0);
   smartlist_free(picked);
 
   /* Try picking two */
   picked = pick_oos_victims(2);
   /* We should get both active orconns */
-  tt_ptr_op(picked, OP_NE, NULL);
+  tt_assert(picked != NULL);
   tt_int_op(smartlist_len(picked), OP_EQ, 2);
   tt_assert(smartlist_contains(picked, smartlist_get(conns_for_mock, 0)));
   tt_assert(smartlist_contains(picked, smartlist_get(conns_for_mock, 1)));
@@ -457,3 +453,4 @@ struct testcase_t oos_tests[] = {
   { "pick_oos_victims", test_oos_pick_oos_victims, TT_FORK, NULL, NULL },
   END_OF_TESTCASES
 };
+

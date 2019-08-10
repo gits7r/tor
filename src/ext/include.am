@@ -5,12 +5,10 @@ EXTRA_DIST += src/ext/README
 
 EXTHEADERS = \
   src/ext/ht.h		\
-  src/ext/byteorder.h   \
   src/ext/tinytest.h	\
   src/ext/tor_readpassphrase.h \
   src/ext/strlcat.c	\
   src/ext/strlcpy.c	\
-  src/ext/getdelim.c    \
   src/ext/tinytest_macros.h \
   src/ext/tor_queue.h	\
   src/ext/siphash.h \
@@ -102,7 +100,6 @@ noinst_LIBRARIES += $(LIBED25519_REF10)
 src_ext_ed25519_donna_libed25519_donna_a_CFLAGS=\
   @CFLAGS_CONSTTIME@ \
   -DED25519_CUSTOMRANDOM \
-  -DED25519_CUSTOMHASH \
   -DED25519_SUFFIX=_donna
 
 src_ext_ed25519_donna_libed25519_donna_a_SOURCES= \
@@ -143,7 +140,6 @@ noinst_HEADERS += $(ED25519_DONNA_HDRS)
 LIBED25519_DONNA=src/ext/ed25519/donna/libed25519_donna.a
 noinst_LIBRARIES += $(LIBED25519_DONNA)
 
-if BUILD_KECCAK_TINY
 src_ext_keccak_tiny_libkeccak_tiny_a_CFLAGS=\
   @CFLAGS_CONSTTIME@
 
@@ -157,7 +153,6 @@ noinst_HEADERS += $(LIBKECCAK_TINY_HDRS)
 
 LIBKECCAK_TINY=src/ext/keccak-tiny/libkeccak-tiny.a
 noinst_LIBRARIES += $(LIBKECCAK_TINY)
-endif
 
 EXTRA_DIST += \
 	src/ext/timeouts/bench/bench-add.lua 		\
@@ -176,3 +171,4 @@ EXTRA_DIST += \
 	src/ext/timeouts/Makefile			\
 	src/ext/timeouts/Rules.shrc			\
 	src/ext/timeouts/test-timeout.c
+

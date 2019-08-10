@@ -1,17 +1,12 @@
 /* Copyright (c) 2001-2004, Roger Dingledine.
  * Copyright (c) 2004-2006, Roger Dingledine, Nick Mathewson.
- * Copyright (c) 2007-2019, The Tor Project, Inc. */
+ * Copyright (c) 2007-2016, The Tor Project, Inc. */
 /* See LICENSE for licensing information */
 
 #include "orconfig.h"
-#include "core/or/or.h"
-#include "lib/crypt_ops/crypto_rand.h"
-#include "feature/dircommon/fp_pair.h"
-#include "test/test.h"
-
-#include "lib/container/bitarray.h"
-#include "lib/container/order.h"
-#include "lib/crypt_ops/digestset.h"
+#include "or.h"
+#include "fp_pair.h"
+#include "test.h"
 
 /** Helper: return a tristate based on comparing the strings in *<b>a</b> and
  * *<b>b</b>. */
@@ -94,30 +89,6 @@ test_container_smartlist_basic(void *arg)
   tor_free(v22);
   tor_free(v99);
   tor_free(v555);
-}
-
-/** Test SMARTLIST_FOREACH_REVERSE_BEGIN loop macro */
-static void
-test_container_smartlist_foreach_reverse(void *arg)
-{
-  smartlist_t *sl = smartlist_new();
-  int i;
-
-  (void) arg;
-
-  /* Add integers to smartlist in increasing order */
-  for (i=0;i<100;i++) {
-    smartlist_add(sl, (void*)(uintptr_t)i);
-  }
-
-  /* Pop them out in reverse and test their value */
-  SMARTLIST_FOREACH_REVERSE_BEGIN(sl, void*, k) {
-    i--;
-    tt_ptr_op(k, OP_EQ, (void*)(uintptr_t)i);
-  } SMARTLIST_FOREACH_END(k);
-
- done:
-  smartlist_free(sl);
 }
 
 /** Run unit tests for smartlist-of-strings functionality. */
@@ -539,22 +510,22 @@ test_container_smartlist_pos(void *arg)
   smartlist_add_strdup(sl, "function");
 
   /* Test string_pos */
-  tt_int_op(smartlist_string_pos(NULL, "Fred"), OP_EQ, -1);
-  tt_int_op(smartlist_string_pos(sl, "Fred"), OP_EQ, -1);
-  tt_int_op(smartlist_string_pos(sl, "This"), OP_EQ, 0);
-  tt_int_op(smartlist_string_pos(sl, "a"), OP_EQ, 2);
-  tt_int_op(smartlist_string_pos(sl, "function"), OP_EQ, 6);
+  tt_int_op(smartlist_string_pos(NULL, "Fred"), ==, -1);
+  tt_int_op(smartlist_string_pos(sl, "Fred"), ==, -1);
+  tt_int_op(smartlist_string_pos(sl, "This"), ==, 0);
+  tt_int_op(smartlist_string_pos(sl, "a"), ==, 2);
+  tt_int_op(smartlist_string_pos(sl, "function"), ==, 6);
 
   /* Test pos */
-  tt_int_op(smartlist_pos(NULL, "Fred"), OP_EQ, -1);
-  tt_int_op(smartlist_pos(sl, "Fred"), OP_EQ, -1);
-  tt_int_op(smartlist_pos(sl, "This"), OP_EQ, -1);
-  tt_int_op(smartlist_pos(sl, "a"), OP_EQ, -1);
-  tt_int_op(smartlist_pos(sl, "function"), OP_EQ, -1);
-  tt_int_op(smartlist_pos(sl, smartlist_get(sl,0)), OP_EQ, 0);
-  tt_int_op(smartlist_pos(sl, smartlist_get(sl,2)), OP_EQ, 2);
-  tt_int_op(smartlist_pos(sl, smartlist_get(sl,5)), OP_EQ, 5);
-  tt_int_op(smartlist_pos(sl, smartlist_get(sl,6)), OP_EQ, 6);
+  tt_int_op(smartlist_pos(NULL, "Fred"), ==, -1);
+  tt_int_op(smartlist_pos(sl, "Fred"), ==, -1);
+  tt_int_op(smartlist_pos(sl, "This"), ==, -1);
+  tt_int_op(smartlist_pos(sl, "a"), ==, -1);
+  tt_int_op(smartlist_pos(sl, "function"), ==, -1);
+  tt_int_op(smartlist_pos(sl, smartlist_get(sl,0)), ==, 0);
+  tt_int_op(smartlist_pos(sl, smartlist_get(sl,2)), ==, 2);
+  tt_int_op(smartlist_pos(sl, smartlist_get(sl,5)), ==, 5);
+  tt_int_op(smartlist_pos(sl, smartlist_get(sl,6)), ==, 6);
 
  done:
   SMARTLIST_FOREACH(sl, char *, str, tor_free(str));
@@ -604,66 +575,6 @@ test_container_smartlist_ints_eq(void *arg)
     SMARTLIST_FOREACH(sl2, int *, ip, tor_free(ip));
   smartlist_free(sl1);
   smartlist_free(sl2);
-}
-
-static void
-test_container_smartlist_grow(void *arg)
-{
-  (void)arg;
-  smartlist_t *sl = smartlist_new();
-  int i;
-  const char *s[] = { "first", "2nd", "3rd" };
-
-  /* case 1: starting from empty. */
-  smartlist_grow(sl, 10);
-  tt_int_op(10, OP_EQ, smartlist_len(sl));
-  for (i = 0; i < 10; ++i) {
-    tt_ptr_op(smartlist_get(sl, i), OP_EQ, NULL);
-  }
-
-  /* case 2: starting with a few elements, probably not reallocating. */
-  smartlist_free(sl);
-  sl = smartlist_new();
-  smartlist_add(sl, (char*)s[0]);
-  smartlist_add(sl, (char*)s[1]);
-  smartlist_add(sl, (char*)s[2]);
-  smartlist_grow(sl, 5);
-  tt_int_op(5, OP_EQ, smartlist_len(sl));
-  for (i = 0; i < 3; ++i) {
-    tt_ptr_op(smartlist_get(sl, i), OP_EQ, s[i]);
-  }
-  tt_ptr_op(smartlist_get(sl, 3), OP_EQ, NULL);
-  tt_ptr_op(smartlist_get(sl, 4), OP_EQ, NULL);
-
-  /* case 3: starting with a few elements, but reallocating. */
-  smartlist_free(sl);
-  sl = smartlist_new();
-  smartlist_add(sl, (char*)s[0]);
-  smartlist_add(sl, (char*)s[1]);
-  smartlist_add(sl, (char*)s[2]);
-  smartlist_grow(sl, 100);
-  tt_int_op(100, OP_EQ, smartlist_len(sl));
-  for (i = 0; i < 3; ++i) {
-    tt_ptr_op(smartlist_get(sl, i), OP_EQ, s[i]);
-  }
-  for (i = 3; i < 100; ++i) {
-    tt_ptr_op(smartlist_get(sl, i), OP_EQ, NULL);
-  }
-
-  /* case 4: shrinking doesn't happen. */
-  smartlist_free(sl);
-  sl = smartlist_new();
-  smartlist_add(sl, (char*)s[0]);
-  smartlist_add(sl, (char*)s[1]);
-  smartlist_add(sl, (char*)s[2]);
-  smartlist_grow(sl, 1);
-  tt_int_op(3, OP_EQ, smartlist_len(sl));
-  for (i = 0; i < 3; ++i) {
-    tt_ptr_op(smartlist_get(sl, i), OP_EQ, s[i]);
-  }
-
- done:
-  smartlist_free(sl);
 }
 
 /** Run unit tests for bitarray code */
@@ -728,18 +639,18 @@ test_container_digestset(void *arg)
   }
   set = digestset_new(1000);
   SMARTLIST_FOREACH(included, const char *, cp,
-                    if (digestset_probably_contains(set, cp))
+                    if (digestset_contains(set, cp))
                       ok = 0);
   tt_assert(ok);
   SMARTLIST_FOREACH(included, const char *, cp,
                     digestset_add(set, cp));
   SMARTLIST_FOREACH(included, const char *, cp,
-                    if (!digestset_probably_contains(set, cp))
+                    if (!digestset_contains(set, cp))
                       ok = 0);
   tt_assert(ok);
   for (i = 0; i < 1000; ++i) {
     crypto_rand(d, DIGEST_LEN);
-    if (digestset_probably_contains(set, d))
+    if (digestset_contains(set, d))
       ++false_positives;
   }
   tt_int_op(50, OP_GT, false_positives); /* Should be far lower. */
@@ -770,7 +681,7 @@ test_container_pqueue(void *arg)
 {
   smartlist_t *sl = smartlist_new();
   int (*cmp)(const void *, const void*);
-  const int offset = offsetof(pq_entry_t, idx);
+  const int offset = STRUCT_OFFSET(pq_entry_t, idx);
 #define ENTRY(s) pq_entry_t s = { #s, -1 }
   ENTRY(cows);
   ENTRY(zebras);
@@ -971,50 +882,6 @@ test_container_strmap(void *arg)
   tor_free(v105);
 }
 
-static void
-test_container_smartlist_remove(void *arg)
-{
-  (void) arg;
-  int array[5];
-  smartlist_t *sl = smartlist_new();
-  int i,j;
-
-  for (j=0; j < 2; ++j)
-    for (i=0; i < 5; ++i)
-      smartlist_add(sl, &array[i]);
-
-  smartlist_remove(sl, &array[0]);
-  smartlist_remove(sl, &array[3]);
-  smartlist_remove(sl, &array[4]);
-  tt_assert(! smartlist_contains(sl, &array[0]));
-  tt_assert(smartlist_contains(sl, &array[1]));
-  tt_assert(smartlist_contains(sl, &array[2]));
-  tt_assert(! smartlist_contains(sl, &array[3]));
-  tt_assert(! smartlist_contains(sl, &array[4]));
-  tt_int_op(smartlist_len(sl), OP_EQ, 4);
-
-  smartlist_clear(sl);
-  for (j=0; j < 2; ++j)
-    for (i=0; i < 5; ++i)
-      smartlist_add(sl, &array[i]);
-
-  smartlist_remove_keeporder(sl, &array[0]);
-  smartlist_remove_keeporder(sl, &array[3]);
-  smartlist_remove_keeporder(sl, &array[4]);
-  tt_int_op(smartlist_len(sl), OP_EQ, 4);
-  tt_ptr_op(smartlist_get(sl, 0), OP_EQ, &array[1]);
-  tt_ptr_op(smartlist_get(sl, 1), OP_EQ, &array[2]);
-  tt_ptr_op(smartlist_get(sl, 2), OP_EQ, &array[1]);
-  tt_ptr_op(smartlist_get(sl, 3), OP_EQ, &array[2]);
-  /* Ordinary code should never look at this pointer; we're doing it here
-   * to make sure that we really cleared the pointer we removed.
-   */
-  tt_ptr_op(sl->list[4], OP_EQ, NULL);
-
- done:
-  smartlist_free(sl);
-}
-
 /** Run unit tests for getting the median of a list. */
 static void
 test_container_order_functions(void *arg)
@@ -1083,13 +950,13 @@ test_container_order_functions(void *arg)
   tt_assert(15 == median_time(times, 5));
 
   int32_t int32s[] = { -5, -10, -50, 100 };
-  tt_int_op(-5, OP_EQ, median_int32(int32s, 1));
-  tt_int_op(-10, OP_EQ, median_int32(int32s, 2));
-  tt_int_op(-10, OP_EQ, median_int32(int32s, 3));
-  tt_int_op(-10, OP_EQ, median_int32(int32s, 4));
+  tt_int_op(-5, ==, median_int32(int32s, 1));
+  tt_int_op(-10, ==, median_int32(int32s, 2));
+  tt_int_op(-10, ==, median_int32(int32s, 3));
+  tt_int_op(-10, ==, median_int32(int32s, 4));
 
   long longs[] = { -30, 30, 100, -100, 7 };
-  tt_int_op(7, OP_EQ, find_nth_long(longs, 5, 2));
+  tt_int_op(7, ==, find_nth_long(longs, 5, 2));
 
  done:
   ;
@@ -1199,7 +1066,7 @@ test_container_fp_pair_map(void *arg)
   tt_int_op(fp_pair_map_size(map),OP_EQ, 4);
   fp_pair_map_assert_ok(map);
   fp_pair_map_set(map, &fp5, v104);
-  fp_pair_map_set_by_digests(map, fp6.first, fp6.second, v105);
+  fp_pair_map_set(map, &fp6, v105);
   fp_pair_map_assert_ok(map);
 
   /* Test iterator. */
@@ -1217,8 +1084,7 @@ test_container_fp_pair_map(void *arg)
 
   /* Make sure we removed fp2, but not the others. */
   tt_ptr_op(fp_pair_map_get(map, &fp2),OP_EQ, NULL);
-  tt_ptr_op(fp_pair_map_get_by_digests(map, fp5.first, fp5.second),
-            OP_EQ, v104);
+  tt_ptr_op(fp_pair_map_get(map, &fp5),OP_EQ, v104);
 
   fp_pair_map_assert_ok(map);
   /* Clean up after ourselves. */
@@ -1247,31 +1113,31 @@ test_container_smartlist_most_frequent(void *arg)
   const char *cp;
 
   cp = smartlist_get_most_frequent_string_(sl, &count);
-  tt_int_op(count, OP_EQ, 0);
-  tt_ptr_op(cp, OP_EQ, NULL);
+  tt_int_op(count, ==, 0);
+  tt_ptr_op(cp, ==, NULL);
 
   /* String must be sorted before we call get_most_frequent */
   smartlist_split_string(sl, "abc:def:ghi", ":", 0, 0);
 
   cp = smartlist_get_most_frequent_string_(sl, &count);
-  tt_int_op(count, OP_EQ, 1);
-  tt_str_op(cp, OP_EQ, "ghi"); /* Ties broken in favor of later element */
+  tt_int_op(count, ==, 1);
+  tt_str_op(cp, ==, "ghi"); /* Ties broken in favor of later element */
 
   smartlist_split_string(sl, "def:ghi", ":", 0, 0);
   smartlist_sort_strings(sl);
 
   cp = smartlist_get_most_frequent_string_(sl, &count);
-  tt_int_op(count, OP_EQ, 2);
-  tt_ptr_op(cp, OP_NE, NULL);
-  tt_str_op(cp, OP_EQ, "ghi"); /* Ties broken in favor of later element */
+  tt_int_op(count, ==, 2);
+  tt_ptr_op(cp, !=, NULL);
+  tt_str_op(cp, ==, "ghi"); /* Ties broken in favor of later element */
 
   smartlist_split_string(sl, "def:abc:qwop", ":", 0, 0);
   smartlist_sort_strings(sl);
 
   cp = smartlist_get_most_frequent_string_(sl, &count);
-  tt_int_op(count, OP_EQ, 3);
-  tt_ptr_op(cp, OP_NE, NULL);
-  tt_str_op(cp, OP_EQ, "def"); /* No tie */
+  tt_int_op(count, ==, 3);
+  tt_ptr_op(cp, !=, NULL);
+  tt_str_op(cp, ==, "def"); /* No tie */
 
  done:
   SMARTLIST_FOREACH(sl, char *, str, tor_free(str));
@@ -1300,7 +1166,7 @@ test_container_smartlist_sort_ptrs(void *arg)
     smartlist_shuffle(sl);
     smartlist_sort_pointers(sl);
     for (j = 0; j < ARRAY_LENGTH(arrayptrs); ++j) {
-      tt_ptr_op(smartlist_get(sl, j), OP_EQ, arrayptrs[j]);
+      tt_ptr_op(smartlist_get(sl, j), ==, arrayptrs[j]);
     }
   }
 
@@ -1326,11 +1192,11 @@ test_container_smartlist_strings_eq(void *arg)
   } while (0)
 
   /* Both NULL, so equal */
-  tt_int_op(1, OP_EQ, smartlist_strings_eq(NULL, NULL));
+  tt_int_op(1, ==, smartlist_strings_eq(NULL, NULL));
 
   /* One NULL, not equal. */
-  tt_int_op(0, OP_EQ, smartlist_strings_eq(NULL, sl1));
-  tt_int_op(0, OP_EQ, smartlist_strings_eq(sl1, NULL));
+  tt_int_op(0, ==, smartlist_strings_eq(NULL, sl1));
+  tt_int_op(0, ==, smartlist_strings_eq(sl1, NULL));
 
   /* Both empty, both equal. */
   EQ_SHOULD_SAY("", "", 1);
@@ -1369,14 +1235,11 @@ test_container_smartlist_strings_eq(void *arg)
 struct testcase_t container_tests[] = {
   CONTAINER_LEGACY(smartlist_basic),
   CONTAINER_LEGACY(smartlist_strings),
-  CONTAINER_LEGACY(smartlist_foreach_reverse),
   CONTAINER_LEGACY(smartlist_overlap),
   CONTAINER_LEGACY(smartlist_digests),
   CONTAINER_LEGACY(smartlist_join),
   CONTAINER_LEGACY(smartlist_pos),
-  CONTAINER(smartlist_remove, 0),
   CONTAINER(smartlist_ints_eq, 0),
-  CONTAINER(smartlist_grow, 0),
   CONTAINER_LEGACY(bitarray),
   CONTAINER_LEGACY(digestset),
   CONTAINER_LEGACY(strmap),
@@ -1389,3 +1252,4 @@ struct testcase_t container_tests[] = {
   CONTAINER(smartlist_strings_eq, 0),
   END_OF_TESTCASES
 };
+

@@ -1,8 +1,8 @@
-/* Copyright (c) 2014-2019, The Tor Project, Inc. */
+/* Copyright (c) 2014-2016, The Tor Project, Inc. */
 /* See LICENSE for licensing information */
 
 #include "orconfig.h"
-#include "core/or/or.h"
+#include "or.h"
 
 #ifdef _WIN32
 #include <direct.h>
@@ -10,12 +10,9 @@
 #include <dirent.h>
 #endif
 
-#include "app/config/config.h"
-#include "test/test.h"
-
-#ifdef HAVE_SYS_STAT_H
-#include <sys/stat.h>
-#endif
+#include "config.h"
+#include "test.h"
+#include "util.h"
 
 #ifdef _WIN32
 #define mkdir(a,b) mkdir(a)
@@ -23,7 +20,7 @@
 #define umask(mask) ((void)0)
 #else
 #define tt_int_op_nowin(a,op,b) tt_int_op((a),op,(b))
-#endif /* defined(_WIN32) */
+#endif
 
 /** Run unit tests for private dir permission enforcement logic. */
 static void
@@ -149,3 +146,4 @@ struct testcase_t checkdir_tests[] = {
   CHECKDIR(perms, TT_FORK),
   END_OF_TESTCASES
 };
+

@@ -1,20 +1,12 @@
-/* Copyright (c) 2015-2019, The Tor Project, Inc. */
-/* See LICENSE for licensing information */
-
 #include "orconfig.h"
-#include "lib/crypt_ops/crypto_util.h"
-
-#include "lib/intmath/cmp.h"
-#include "lib/malloc/malloc.h"
-
 #include <string.h>
 #include <stdio.h>
 #include <sys/types.h>
 #include <stdlib.h>
 
-#ifdef HAVE_SYS_PARAM_H
-#include <sys/param.h>
-#endif
+#include "crypto.h"
+#include "compat.h"
+#include "util.h"
 
 static unsigned fill_a_buffer_memset(void) __attribute__((noinline));
 static unsigned fill_a_buffer_memwipe(void) __attribute__((noinline));
@@ -44,12 +36,11 @@ const char *s = NULL;
     sum += (unsigned char)buf[i];                                       \
   }
 
-#ifdef OpenBSD
+#ifdef __OpenBSD__
 /* Disable some of OpenBSD's malloc protections for this test. This helps
  * us do bad things, such as access freed buffers, without crashing. */
-extern const char *malloc_options;
-const char *malloc_options = "sufjj";
-#endif /* defined(OpenBSD) */
+const char *malloc_options="sufjj";
+#endif
 
 static unsigned
 fill_a_buffer_memset(void)
@@ -91,7 +82,7 @@ static unsigned
 check_a_buffer(void)
 {
   unsigned int i;
-  volatile char buf[BUF_LEN];
+  volatile char buf[1024];
   unsigned sum = 0;
 
   /* See if this buffer has the string in it.
@@ -221,3 +212,4 @@ main(int argc, char **argv)
     return 0;
   }
 }
+
